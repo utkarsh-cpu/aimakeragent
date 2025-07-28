@@ -37,6 +37,7 @@ import {
 } from "../hooks/use-keyboard-navigation";
 import { ScreenReaderAnnouncer } from "../utils/accessibility";
 import { useVoiceNavigation } from "./VoiceInput";
+import { ChatErrorBoundary, SidebarErrorBoundary, SettingsErrorBoundary } from "./ErrorBoundary";
 
 interface ChatAppProps {
   isDarkMode: boolean;
@@ -931,29 +932,31 @@ export function ChatApp({
   }) => (
     <Sheet open={isOpen} onOpenChange={onClose}>
       <SheetContent side="left" className="p-0 w-80">
-        <ChatSidebar
-          conversations={conversations}
-          currentConversationId={currentConversationId}
-          onSelectConversation={(id: string) => {
-            setCurrentConversationId(id);
-            setIsSidebarOpen(false);
-            setTimeout(() => scrollToBottom(), 100);
-          }}
-          onNewConversation={createNewConversationHandler}
-          onDeleteConversation={deleteConversation}
-          onUpdateTitle={updateConversationTitleHandler}
-          searchQuery=""
-          onSearchChange={() => {}}
-          onExportConversation={() => {
-            if (currentConversation) {
-              exportConversationHandler(currentConversation.id);
-            }
-          }}
-          onToggleFavorite={toggleFavoriteHandler}
-          onToggleArchive={toggleArchiveHandler}
-          onBulkDelete={bulkDeleteHandler}
-          onBulkExport={bulkExportHandler}
-        />
+        <SidebarErrorBoundary>
+          <ChatSidebar
+            conversations={conversations}
+            currentConversationId={currentConversationId}
+            onSelectConversation={(id: string) => {
+              setCurrentConversationId(id);
+              setIsSidebarOpen(false);
+              setTimeout(() => scrollToBottom(), 100);
+            }}
+            onNewConversation={createNewConversationHandler}
+            onDeleteConversation={deleteConversation}
+            onUpdateTitle={updateConversationTitleHandler}
+            searchQuery=""
+            onSearchChange={() => {}}
+            onExportConversation={() => {
+              if (currentConversation) {
+                exportConversationHandler(currentConversation.id);
+              }
+            }}
+            onToggleFavorite={toggleFavoriteHandler}
+            onToggleArchive={toggleArchiveHandler}
+            onBulkDelete={bulkDeleteHandler}
+            onBulkExport={bulkExportHandler}
+          />
+        </SidebarErrorBoundary>
       </SheetContent>
     </Sheet>
   );
@@ -971,80 +974,7 @@ export function ChatApp({
             isOpen={isSidebarOpen}
             onClose={() => setIsSidebarOpen(false)}
           />
-          <div className="flex flex-col h-full">
-            <ChatHeader
-              conversation={currentConversation}
-              settings={settings}
-              onSettingsChange={handleSettingsChange}
-              isDarkMode={isDarkMode}
-              onThemeToggle={setIsDarkMode}
-              onSettingsToggle={() => setIsSettingsOpen(true)}
-              onSidebarToggle={() => setIsSidebarOpen(true)}
-              isMobile={isMobile}
-              showSearch={showSearch}
-              onToggleSearch={toggleSearch}
-              onShowKeyboardHelp={() => setShowKeyboardHelp(true)}
-            />
-            <div className="flex-1 overflow-hidden">
-              <ChatMessages
-                messages={currentConversation?.messages || []}
-                isTyping={isTyping}
-                streamingMessageId={streamingMessageId}
-                onCopyMessage={copyMessage}
-                onRegenerateMessage={regenerateMessage}
-                onRateMessage={rateMessage}
-                onEditMessage={editMessage}
-                onDeleteMessage={deleteConversation}
-                onQuoteMessage={quoteMessage}
-                onCancelStream={cancelStream}
-                fontSize={settings.fontSize}
-                showSearch={showSearch}
-                onToggleSearch={toggleSearch}
-                selectedMessageId={selectedMessageId || undefined}
-                onMessageSelect={setSelectedMessageId}
-              />
-              <div ref={messagesEndRef} />
-            </div>
-            <ChatInput
-              value={draftMessage}
-              onChange={setDraftMessage}
-              onSendMessage={sendMessage}
-              disabled={isTyping || !!streamingMessageId}
-              isMobile={isMobile}
-              enableVoiceInput={true}
-            />
-          </div>
-        </>
-      ) : (
-        <ResizablePanelGroup direction="horizontal">
-          <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-            <ChatSidebar
-              conversations={conversations}
-              currentConversationId={currentConversationId}
-              onSelectConversation={(id: string) => {
-                setCurrentConversationId(id);
-                setTimeout(() => scrollToBottom(), 100);
-              }}
-              onNewConversation={createNewConversationHandler}
-              onDeleteConversation={deleteConversation}
-              onUpdateTitle={updateConversationTitleHandler}
-              searchQuery=""
-              onSearchChange={() => {}}
-              onExportConversation={() => {
-                if (currentConversation) {
-                  exportConversationHandler(currentConversation.id);
-                }
-              }}
-              onToggleFavorite={toggleFavoriteHandler}
-              onToggleArchive={toggleArchiveHandler}
-              onBulkDelete={bulkDeleteHandler}
-              onBulkExport={bulkExportHandler}
-            />
-          </ResizablePanel>
-
-          <ResizableHandle />
-
-          <ResizablePanel defaultSize={75}>
+          <ChatErrorBoundary>
             <div className="flex flex-col h-full">
               <ChatHeader
                 conversation={currentConversation}
@@ -1053,12 +983,12 @@ export function ChatApp({
                 isDarkMode={isDarkMode}
                 onThemeToggle={setIsDarkMode}
                 onSettingsToggle={() => setIsSettingsOpen(true)}
-                isMobile={false}
+                onSidebarToggle={() => setIsSidebarOpen(true)}
+                isMobile={isMobile}
                 showSearch={showSearch}
                 onToggleSearch={toggleSearch}
                 onShowKeyboardHelp={() => setShowKeyboardHelp(true)}
               />
-
               <div className="flex-1 overflow-hidden">
                 <ChatMessages
                   messages={currentConversation?.messages || []}
@@ -1079,26 +1009,107 @@ export function ChatApp({
                 />
                 <div ref={messagesEndRef} />
               </div>
-
               <ChatInput
                 value={draftMessage}
                 onChange={setDraftMessage}
                 onSendMessage={sendMessage}
                 disabled={isTyping || !!streamingMessageId}
-                isMobile={false}
+                isMobile={isMobile}
                 enableVoiceInput={true}
               />
             </div>
+          </ChatErrorBoundary>
+        </>
+      ) : (
+        <ResizablePanelGroup direction="horizontal">
+          <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
+            <SidebarErrorBoundary>
+              <ChatSidebar
+                conversations={conversations}
+                currentConversationId={currentConversationId}
+                onSelectConversation={(id: string) => {
+                  setCurrentConversationId(id);
+                  setTimeout(() => scrollToBottom(), 100);
+                }}
+                onNewConversation={createNewConversationHandler}
+                onDeleteConversation={deleteConversation}
+                onUpdateTitle={updateConversationTitleHandler}
+                searchQuery=""
+                onSearchChange={() => {}}
+                onExportConversation={() => {
+                  if (currentConversation) {
+                    exportConversationHandler(currentConversation.id);
+                  }
+                }}
+                onToggleFavorite={toggleFavoriteHandler}
+                onToggleArchive={toggleArchiveHandler}
+                onBulkDelete={bulkDeleteHandler}
+                onBulkExport={bulkExportHandler}
+              />
+            </SidebarErrorBoundary>
+          </ResizablePanel>
+
+          <ResizableHandle />
+
+          <ResizablePanel defaultSize={75}>
+            <ChatErrorBoundary>
+              <div className="flex flex-col h-full">
+                <ChatHeader
+                  conversation={currentConversation}
+                  settings={settings}
+                  onSettingsChange={handleSettingsChange}
+                  isDarkMode={isDarkMode}
+                  onThemeToggle={setIsDarkMode}
+                  onSettingsToggle={() => setIsSettingsOpen(true)}
+                  isMobile={false}
+                  showSearch={showSearch}
+                  onToggleSearch={toggleSearch}
+                  onShowKeyboardHelp={() => setShowKeyboardHelp(true)}
+                />
+
+                <div className="flex-1 overflow-hidden">
+                  <ChatMessages
+                    messages={currentConversation?.messages || []}
+                    isTyping={isTyping}
+                    streamingMessageId={streamingMessageId}
+                    onCopyMessage={copyMessage}
+                    onRegenerateMessage={regenerateMessage}
+                    onRateMessage={rateMessage}
+                    onEditMessage={editMessage}
+                    onDeleteMessage={deleteConversation}
+                    onQuoteMessage={quoteMessage}
+                    onCancelStream={cancelStream}
+                    fontSize={settings.fontSize}
+                    showSearch={showSearch}
+                    onToggleSearch={toggleSearch}
+                    selectedMessageId={selectedMessageId || undefined}
+                    onMessageSelect={setSelectedMessageId}
+                  />
+                  <div ref={messagesEndRef} />
+                </div>
+
+                <ChatInput
+                  value={draftMessage}
+                  onChange={setDraftMessage}
+                  onSendMessage={sendMessage}
+                  disabled={isTyping || !!streamingMessageId}
+                  isMobile={false}
+                  enableVoiceInput={true}
+                />
+              </div>
+            </ChatErrorBoundary>
           </ResizablePanel>
         </ResizablePanelGroup>
       )}
 
       {isSettingsOpen && (
-        <SettingsPanel
-          settings={settings}
-          onSettingsChange={handleSettingsChange}
-          onClose={() => setIsSettingsOpen(false)}
-        />
+        <SettingsErrorBoundary>
+          <SettingsPanel
+            settings={settings}
+            onSettingsChange={handleSettingsChange}
+            onClose={() => setIsSettingsOpen(false)}
+          />
+        </SettingsErrorBoundary>
       )}
 
       <KeyboardShortcutsHelp

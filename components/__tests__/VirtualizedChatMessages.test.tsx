@@ -21,7 +21,29 @@ vi.mock('../../utils/virtual-scroll', () => ({
     shouldUpdate: vi.fn(() => true),
     updateConfig: vi.fn(),
     getTotalHeight: vi.fn((itemCount: number) => itemCount * 100)
-  }))
+  })),
+  useVirtualScroll: vi.fn(() => ({
+    visibleItems: [],
+    totalHeight: 0,
+    scrollToIndex: vi.fn(),
+    scrollToTop: vi.fn(),
+    scrollToBottom: vi.fn(),
+    containerRef: { current: null },
+    handleScroll: vi.fn(),
+    setScrollElement: vi.fn(),
+  })),
+  useDynamicVirtualScroll: vi.fn(() => ({
+    visibleItems: [],
+    totalHeight: 0,
+    scrollToIndex: vi.fn(),
+    scrollToTop: vi.fn(),
+    scrollToBottom: vi.fn(),
+    setScrollElement: vi.fn(),
+    measureItem: vi.fn(),
+  })),
+  createVirtualScrollManager: vi.fn(),
+  calculateOptimalItemHeight: vi.fn(() => 60),
+  estimateItemHeight: vi.fn(() => 60),
 }));
 
 // Mock intersection observer

@@ -1,195 +1,106 @@
 /**
- * Stream Processor for handling Server-Sent Events (SSE) responses
- * Provides robust chunk parsing, token extraction, and error handling for streaming AI responses
+ * Stream processing utilities for handling SSE responses
  */
 
-export interface StreamingHandler {
+export interface StreamHandler {
   onToken: (token: string) => void;
   onComplete: (fullResponse: string) => void;
   onError: (error: Error) => void;
   onStart: () => void;
 }
 
-export enum StreamErrorType {
-  PARSE_ERROR = 'PARSE_ERROR',
-  CONNECTION_ERROR = 'CONNECTION_ERROR',
-  TIMEOUT_ERROR = 'TIMEOUT_ERROR',
-  CANCELLATION_ERROR = 'CANCELLATION_ERROR'
-}
-
 export class StreamError extends Error {
-  constructor(
-    public type: StreamErrorType,
-    message: string,
-    public originalError?: Error
-  ) {
+  constructor(message: string, public readonly code?: string) {
     super(message);
     this.name = 'StreamError';
   }
 }
 
 export class StreamProcessor {
-  private handler: StreamingHandler;
+  private handler: StreamHandler;
   private buffer: string = '';
   private fullResponse: string = '';
-  private isActive: boolean = false;
-  private abortController?: AbortController;
-  private timeoutId?: NodeJS.Timeout;
-  private readonly timeout: number;
+  private isProcessing: boolean = false;
 
-  constructor(handler: StreamingHandler, timeout: number = 30000) {
+  constructor(handler: StreamHandler) {
     this.handler = handler;
-    this.timeout = timeout;
   }
 
   /**
-   * Start processing a streaming response
+   * Start processing stream
    */
-  async processStream(response: Response): Promise<void> {
-    if (this.isActive) {
-      throw new StreamError(StreamErrorType.CONNECTION_ERROR, 'Stream processor is already active');
+  start(): void {
+    if (this.isProcessing) {
+      throw new StreamError('Stream is already being processed');
     }
-
-    this.isActive = true;
+    
+    this.isProcessing = true;
     this.buffer = '';
     this.fullResponse = '';
-    this.abortController = new AbortController();
-
-    // Set up timeout
-    this.timeoutId = setTimeout(() => {
-      this.error(new StreamError(StreamErrorType.TIMEOUT_ERROR, 'Stream processing timed out'));
-    }, this.timeout);
-
-    try {
-      this.handler.onStart();
-      await this.readStream(response);
-    } catch (error) {
-      if (error instanceof StreamError) {
-        this.error(error);
-      } else {
-        this.error(new StreamError(
-          StreamErrorType.CONNECTION_ERROR,
-          'Failed to process stream',
-          error instanceof Error ? error : new Error(String(error))
-        ));
-      }
-    }
+    this.handler.onStart();
   }
 
   /**
-   * Process a single chunk of data
+   * Process a chunk of stream data
    */
   processChunk(chunk: string): void {
-    if (!this.isActive) {
-      return;
+    if (!this.isProcessing) {
+      throw new StreamError('Stream is not active');
     }
 
     this.buffer += chunk;
+    
+    // Process complete lines
     const lines = this.buffer.split('\n');
-    this.buffer = lines.pop() || '';
+    this.buffer = lines.pop() || ''; // Keep incomplete line in buffer
 
     for (const line of lines) {
-      const token = this.parseSSEChunk(line);
-      if (token !== null) {
-        this.fullResponse += token;
-        this.handler.onToken(token);
+      this.processLine(line);
+    }
+  }
+
+  /**
+   * Process a single line of SSE data
+   */
+  private processLine(line: string): void {
+    const trimmed = line.trim();
+    
+    if (!trimmed || trimmed.startsWith(':')) {
+      return; // Skip empty lines and comments
+    }
+
+    if (trimmed === 'data: [DONE]') {
+      this.complete();
+      return;
+    }
+
+    if (trimmed.startsWith('data: ')) {
+      const data = trimmed.substring(6);
+      
+      try {
+        const parsed = JSON.parse(data);
+        const content = this.extractContent(parsed);
+        
+        if (content) {
+          this.fullResponse += content;
+          this.handler.onToken(content);
+        }
+      } catch (error) {
+        console.warn('Failed to parse SSE data:', data, error);
       }
     }
   }
 
   /**
-   * Complete the stream processing
-   */
-  complete(): void {
-    if (!this.isActive) {
-      return;
-    }
-
-    this.cleanup();
-    this.handler.onComplete(this.fullResponse);
-  }
-
-  /**
-   * Handle stream error
-   */
-  error(error: Error): void {
-    if (!this.isActive) {
-      return;
-    }
-
-    this.cleanup();
-    this.handler.onError(error);
-  }
-
-  /**
-   * Cancel the current stream
-   */
-  cancel(): void {
-    if (!this.isActive) {
-      return;
-    }
-
-    if (this.abortController) {
-      this.abortController.abort();
-    }
-
-    this.error(new StreamError(StreamErrorType.CANCELLATION_ERROR, 'Stream was cancelled'));
-  }
-
-  /**
-   * Check if the processor is currently active
-   */
-  isProcessing(): boolean {
-    return this.isActive;
-  }
-
-  /**
-   * Parse a Server-Sent Events chunk
-   */
-  private parseSSEChunk(line: string): string | null {
-    const trimmed = line.trim();
-    
-    if (!trimmed.startsWith('data: ')) {
-      return null;
-    }
-
-    const data = trimmed.slice(6);
-    
-    // Check for stream completion
-    if (data === '[DONE]') {
-      this.complete();
-      return null;
-    }
-
-    try {
-      const parsed = JSON.parse(data);
-      return this.extractContent(parsed);
-    } catch (error) {
-      // Log parse errors but don't fail the entire stream
-      console.warn('Failed to parse SSE chunk:', data, error);
-      return null;
-    }
-  }
-
-  /**
-   * Extract content from parsed JSON data
+   * Extract content from parsed SSE data
    */
   private extractContent(data: any): string {
     // Handle OpenRouter/OpenAI format
-    const choice = data.choices?.[0];
-    if (choice) {
-      // Check for delta content (streaming format)
-      if (choice.delta?.content) {
-        return choice.delta.content;
-      }
-      
-      // Check for message content (non-streaming format)
-      if (choice.message?.content) {
-        return choice.message.content;
-      }
+    if (data.choices && data.choices[0] && data.choices[0].delta) {
+      return data.choices[0].delta.content || '';
     }
 
-    // Handle other potential formats
+    // Handle other formats
     if (data.content) {
       return data.content;
     }
@@ -202,18 +113,64 @@ export class StreamProcessor {
   }
 
   /**
-   * Read the stream using ReadableStream API
+   * Complete the stream processing
    */
-  private async readStream(response: Response): Promise<void> {
-    const reader = response.body?.getReader();
-    if (!reader) {
-      throw new StreamError(StreamErrorType.CONNECTION_ERROR, 'No response body available for streaming');
+  complete(): void {
+    if (!this.isProcessing) {
+      return;
     }
 
+    this.isProcessing = false;
+    this.handler.onComplete(this.fullResponse);
+  }
+
+  /**
+   * Handle stream error
+   */
+  error(error: Error): void {
+    this.isProcessing = false;
+    this.handler.onError(error);
+  }
+
+  /**
+   * Cancel stream processing
+   */
+  cancel(): void {
+    if (this.isProcessing) {
+      this.isProcessing = false;
+      this.error(new StreamError('Stream was cancelled', 'CANCELLED'));
+    }
+  }
+
+  /**
+   * Check if stream is currently processing
+   */
+  isActive(): boolean {
+    return this.isProcessing;
+  }
+
+  /**
+   * Get current full response
+   */
+  getFullResponse(): string {
+    return this.fullResponse;
+  }
+
+  /**
+   * Process a stream response
+   */
+  async processStream(response: Response): Promise<void> {
+    if (!response.body) {
+      throw new StreamError('Response has no body');
+    }
+
+    const reader = response.body.getReader();
     const decoder = new TextDecoder();
 
     try {
-      while (this.isActive) {
+      this.start();
+
+      while (true) {
         const { done, value } = await reader.read();
         
         if (done) {
@@ -221,60 +178,87 @@ export class StreamProcessor {
           break;
         }
 
-        if (this.abortController?.signal.aborted) {
-          throw new StreamError(StreamErrorType.CANCELLATION_ERROR, 'Stream was cancelled');
-        }
-
         const chunk = decoder.decode(value, { stream: true });
         this.processChunk(chunk);
       }
+    } catch (error) {
+      this.error(error instanceof Error ? error : new Error(String(error)));
     } finally {
       reader.releaseLock();
     }
   }
+}
 
-  /**
-   * Clean up resources and reset state
-   */
-  private cleanup(): void {
-    this.isActive = false;
-    
-    if (this.timeoutId) {
-      clearTimeout(this.timeoutId);
-      this.timeoutId = undefined;
+/**
+ * Create a stream processor with handlers
+ */
+export function createStreamProcessor(handlers: StreamHandler): StreamProcessor {
+  return new StreamProcessor(handlers);
+}
+
+/**
+ * Process a ReadableStream response
+ */
+export async function processStreamResponse(
+  response: Response,
+  handlers: StreamHandler
+): Promise<void> {
+  if (!response.body) {
+    throw new StreamError('Response has no body');
+  }
+
+  const processor = createStreamProcessor(handlers);
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  try {
+    processor.start();
+
+    while (true) {
+      const { done, value } = await reader.read();
+      
+      if (done) {
+        processor.complete();
+        break;
+      }
+
+      const chunk = decoder.decode(value, { stream: true });
+      processor.processChunk(chunk);
     }
-    
-    this.abortController = undefined;
+  } catch (error) {
+    processor.error(error instanceof Error ? error : new Error(String(error)));
+  } finally {
+    reader.releaseLock();
   }
 }
 
 /**
- * Utility function to create a StreamProcessor with common error handling
+ * Create a mock stream processor for testing
  */
-export function createStreamProcessor(
-  onToken: (token: string) => void,
-  onComplete: (fullResponse: string) => void,
-  onError: (error: Error) => void,
-  onStart?: () => void,
-  timeout?: number
-): StreamProcessor {
-  const handler: StreamingHandler = {
-    onToken,
-    onComplete,
-    onError,
-    onStart: onStart || (() => {})
+export function createMockStreamProcessor(): {
+  processChunk: any;
+  complete: any;
+  error: any;
+  cancel: any;
+  isProcessing: any;
+} {
+  // Only use jest mocks if jest is available
+  if (typeof jest !== 'undefined') {
+    return {
+      processChunk: jest.fn(),
+      complete: jest.fn(),
+      error: jest.fn(),
+      cancel: jest.fn(),
+      isProcessing: jest.fn(() => false),
+    };
+  }
+  
+  // Fallback for non-test environments
+  return {
+    processChunk: () => {},
+    complete: () => {},
+    error: () => {},
+    cancel: () => {},
+    isProcessing: () => false,
   };
-
-  return new StreamProcessor(handler, timeout);
-}
-
-/**
- * Helper function to determine if an error is recoverable
- */
-export function isRecoverableStreamError(error: Error): boolean {
-  if (error instanceof StreamError) {
-    return error.type === StreamErrorType.TIMEOUT_ERROR || 
-           error.type === StreamErrorType.CONNECTION_ERROR;
-  }
-  return false;
 }

@@ -178,7 +178,7 @@ export class OpenRouterService {
    * Check if streaming is currently active
    */
   isStreaming(): boolean {
-    return this.currentStreamProcessor?.isProcessing() || false;
+    return this.currentStreamProcessor?.isActive() || false;
   }
 
   /**
@@ -189,22 +189,21 @@ export class OpenRouterService {
     let isComplete = false;
     let streamError: Error | null = null;
 
-    this.currentStreamProcessor = createStreamProcessor(
-      (token: string) => {
+    this.currentStreamProcessor = createStreamProcessor({
+      onToken: (token: string) => {
         tokens.push(token);
       },
-      () => {
+      onComplete: () => {
         isComplete = true;
       },
-      (error: Error) => {
+      onError: (error: Error) => {
         streamError = error;
         isComplete = true;
       },
-      () => {
+      onStart: () => {
         // Stream started
-      },
-      this.config.timeout
-    );
+      }
+    });
 
     // Start processing the stream
     this.currentStreamProcessor.processStream(response).catch(() => {

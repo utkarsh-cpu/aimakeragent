@@ -7,16 +7,14 @@ import { MarkdownPreview } from './MarkdownPreview';
 import { AttachmentManager, type Attachment } from './AttachmentManager';
 import { VoiceInput } from './VoiceInput';
 import { TextFormatter, formatActions } from '../utils/text-formatting';
-import { 
-  useDebounce, 
-  useDebounceCallback, 
-  usePerformanceMonitor,
-  useOptimizedInput,
-  useRenderOptimization
+import {
+  useDebounce,
+  useDebounceCallback,
+  usePerformanceMonitor
 } from '../utils/debounce';
-import { 
-  Send, 
-  Mic, 
+import {
+  Send,
+  Mic,
   MoreHorizontal,
   Eye,
   Edit3,
@@ -39,11 +37,11 @@ interface ChatInputProps {
   enableVoiceInput?: boolean;
 }
 
-export function ChatInput({ 
-  value, 
-  onChange, 
-  onSendMessage, 
-  disabled, 
+export function ChatInput({
+  value,
+  onChange,
+  onSendMessage,
+  disabled,
   isMobile = false,
   maxTokens = 4000,
   enableVoiceInput = true
@@ -59,47 +57,20 @@ export function ChatInput({
   // Performance monitoring
   usePerformanceMonitor('ChatInput', 16);
 
-  // Optimized input handling with smart debouncing
-  const {
-    value: optimizedValue,
-    debouncedValue,
-    setValue: setOptimizedValue,
-  } = useOptimizedInput(value, {
-    debounceDelay: 100,
-    validateDelay: 200,
-    maxLength: maxTokens * 4, // Rough character to token ratio
-    validator: (val) => val.length < maxTokens * 4,
-  });
-
-  // Sync with parent component
-  useEffect(() => {
-    if (optimizedValue !== value) {
-      setOptimizedValue(value);
-    }
-  }, [value, optimizedValue, setOptimizedValue]);
+  // Debounced value for validation
+  const debouncedValue = useDebounce(value, 100);
 
   // Debounced attachments for validation
   const debouncedAttachments = useDebounce(attachments, 150);
 
   // Memoize validation with render optimization
-  const validation = useRenderOptimization(
-    useMemo(() => {
-      return TextFormatter.validateInput(debouncedValue, maxTokens, debouncedAttachments);
-    }, [debouncedValue, maxTokens, debouncedAttachments]),
-    (prev, next) => {
-      return prev.tokenCount === next.tokenCount && 
-             prev.isOverLimit === next.isOverLimit &&
-             prev.isNearLimit === next.isNearLimit;
-    },
-    100
-  );
+  const validation = useMemo(() => {
+    return TextFormatter.validateInput(debouncedValue, maxTokens, debouncedAttachments);
+  }, [debouncedValue, maxTokens, debouncedAttachments]);
 
   const { tokenCount, isNearLimit, isOverLimit, suggestions, attachmentTokens, totalTokens } = validation;
 
-  // Optimized onChange with batching
-  const debouncedOnChange = useDebounceCallback((newValue: string) => {
-    onChange(newValue);
-  }, 50);
+
 
   const getIconComponent = (iconName: string) => {
     const icons = {
@@ -123,9 +94,9 @@ export function ChatInput({
 
     const selection = TextFormatter.getSelection(textarea);
     const result = TextFormatter.insertFormatting(value, selection, action);
-    
+
     onChange(result.text);
-    
+
     // Reset cursor position
     setTimeout(() => {
       TextFormatter.setSelection(textarea, result.selection);
@@ -144,23 +115,23 @@ export function ChatInput({
       e.preventDefault();
       handleSend();
     }
-    
+
     // Format shortcuts
     if (e.ctrlKey || e.metaKey) {
       const action = formatActions.find(a => {
         const shortcut = a.shortcut.toLowerCase();
         if (shortcut.includes('shift') && !e.shiftKey) return false;
         if (!shortcut.includes('shift') && e.shiftKey) return false;
-        
+
         if (shortcut.includes('ctrl+b') && e.key === 'b') return true;
         if (shortcut.includes('ctrl+i') && e.key === 'i') return true;
         if (shortcut.includes('ctrl+`') && e.key === '`') return true;
         if (shortcut.includes('ctrl+>') && e.key === '>') return true;
         if (shortcut.includes('ctrl+l') && e.key === 'l') return true;
-        
+
         return false;
       });
-      
+
       if (action) {
         e.preventDefault();
         applyFormatting(action.id);
@@ -216,9 +187,9 @@ export function ChatInput({
                 );
               })}
             </div>
-            
+
             <div className="h-4 w-px bg-border mx-1" />
-            
+
             {/* Preview Toggle */}
             <Button
               variant="ghost"
@@ -247,7 +218,7 @@ export function ChatInput({
                 <Mic className="h-3 w-3" />
               </Button>
             )}
-            
+
             <Popover open={isFormatMenuOpen} onOpenChange={setIsFormatMenuOpen}>
               <PopoverTrigger className="inline-flex items-center justify-center whitespace-nowrap rounded-md border border-input bg-background hover:bg-accent hover:text-accent-foreground h-7 px-2 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50">
                 <MoreHorizontal className="h-3 w-3" />
@@ -277,13 +248,13 @@ export function ChatInput({
             </Popover>
 
             <div className="flex-1" />
-            
+
             {/* Enhanced Token Counter with Suggestions */}
             <div className="flex items-center gap-2">
               {suggestions && (
                 <Popover>
                   <PopoverTrigger>
-                    <Badge 
+                    <Badge
                       variant={isOverLimit ? "destructive" : "outline"}
                       className="text-xs cursor-pointer"
                     >
@@ -302,7 +273,7 @@ export function ChatInput({
                   </PopoverContent>
                 </Popover>
               )}
-              <Badge 
+              <Badge
                 variant={isNearLimit ? (isOverLimit ? "destructive" : "outline") : "secondary"}
                 className="text-xs"
               >
@@ -344,7 +315,7 @@ export function ChatInput({
                   {suggestions && (
                     <Popover>
                       <PopoverTrigger>
-                        <Badge 
+                        <Badge
                           variant={isOverLimit ? "destructive" : "outline"}
                           className="text-xs cursor-pointer"
                         >
@@ -363,7 +334,7 @@ export function ChatInput({
                       </PopoverContent>
                     </Popover>
                   )}
-                  <Badge 
+                  <Badge
                     variant={isNearLimit ? (isOverLimit ? "destructive" : "outline") : "secondary"}
                     className="text-xs"
                   >
@@ -376,7 +347,7 @@ export function ChatInput({
                   </Badge>
                 </div>
               </div>
-              
+
               <TabsContent value="write" className="mt-0 p-3 pt-2">
                 <div className="flex items-end gap-3">
                   <AttachmentManager
@@ -390,12 +361,11 @@ export function ChatInput({
                     <textarea
                       ref={textareaRef}
                       value={value}
-                      onChange={(e) => debouncedOnChange(e.target.value)}
+                      onChange={(e) => onChange(e.target.value)}
                       onKeyDown={handleKeyDown}
                       placeholder="Type your message with markdown formatting..."
-                      className={`w-full px-4 py-3 border-0 bg-transparent focus:outline-none resize-none min-h-[44px] max-h-[200px] placeholder:text-muted-foreground/70 ${
-                        isOverLimit ? 'text-destructive' : ''
-                      }`}
+                      className={`w-full px-4 py-3 border-0 bg-transparent focus:outline-none resize-none min-h-[44px] max-h-[200px] placeholder:text-muted-foreground/70 ${isOverLimit ? 'text-destructive' : ''
+                        }`}
                       disabled={disabled}
                       data-chat-input
                       aria-label="Chat message input"
@@ -406,18 +376,17 @@ export function ChatInput({
                   <Button
                     onClick={handleSend}
                     disabled={!canSend}
-                    className={`h-9 w-9 p-0 shrink-0 rounded-lg transition-all duration-200 ${
-                      canSend
-                        ? 'bg-primary hover:bg-primary/90 shadow-sm' 
+                    className={`h-9 w-9 p-0 shrink-0 rounded-lg transition-all duration-200 ${canSend
+                        ? 'bg-primary hover:bg-primary/90 shadow-sm'
                         : 'bg-muted hover:bg-muted/80'
-                    }`}
+                      }`}
                     aria-label="Send message"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
               </TabsContent>
-              
+
               <TabsContent value="preview" className="mt-0 p-3 pt-2">
                 <div className="flex items-start gap-3">
                   <div className="flex-1 min-h-[44px] max-h-[200px] overflow-y-auto">
@@ -426,18 +395,17 @@ export function ChatInput({
                   <Button
                     onClick={handleSend}
                     disabled={!canSend}
-                    className={`h-9 w-9 p-0 shrink-0 rounded-lg transition-all duration-200 ${
-                      canSend
-                        ? 'bg-primary hover:bg-primary/90 shadow-sm' 
+                    className={`h-9 w-9 p-0 shrink-0 rounded-lg transition-all duration-200 ${canSend
+                        ? 'bg-primary hover:bg-primary/90 shadow-sm'
                         : 'bg-muted hover:bg-muted/80'
-                    }`}
+                      }`}
                     aria-label="Send message"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
                 </div>
               </TabsContent>
-              
+
               {enableVoiceInput && showVoiceInput && (
                 <TabsContent value="voice" className="mt-0 p-3 pt-2">
                   <div className="flex items-start gap-3">
@@ -452,11 +420,10 @@ export function ChatInput({
                     <Button
                       onClick={handleSend}
                       disabled={!canSend}
-                      className={`h-9 w-9 p-0 shrink-0 rounded-lg transition-all duration-200 ${
-                        canSend
-                          ? 'bg-primary hover:bg-primary/90 shadow-sm' 
+                      className={`h-9 w-9 p-0 shrink-0 rounded-lg transition-all duration-200 ${canSend
+                          ? 'bg-primary hover:bg-primary/90 shadow-sm'
                           : 'bg-muted hover:bg-muted/80'
-                      }`}
+                        }`}
                       aria-label="Send message"
                     >
                       <Send className="h-4 w-4" />
@@ -478,25 +445,23 @@ export function ChatInput({
                 <textarea
                   ref={textareaRef}
                   value={value}
-                  onChange={(e) => debouncedOnChange(e.target.value)}
+                  onChange={(e) => onChange(e.target.value)}
                   onKeyDown={handleKeyDown}
                   placeholder={isMobile ? "Type your message..." : "Type your message with markdown... (Shift+Enter for new line)"}
-                  className={`w-full px-4 py-3 pr-12 border-0 bg-transparent focus:outline-none resize-none min-h-[44px] max-h-[200px] placeholder:text-muted-foreground/70 ${
-                    isOverLimit ? 'text-destructive' : ''
-                  } ${isMobile ? 'text-base' : ''}`}
+                  className={`w-full px-4 py-3 pr-12 border-0 bg-transparent focus:outline-none resize-none min-h-[44px] max-h-[200px] placeholder:text-muted-foreground/70 ${isOverLimit ? 'text-destructive' : ''
+                    } ${isMobile ? 'text-base' : ''}`}
                   disabled={disabled}
                   data-chat-input
                   aria-label="Chat message input"
                   aria-describedby="token-counter"
                 />
-                
+
                 {(isMobile || !value.trim()) && enableVoiceInput && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    className={`absolute right-2 top-2 h-6 w-6 p-0 ${
-                      isRecording ? 'text-red-500 animate-pulse' : ''
-                    }`}
+                    className={`absolute right-2 top-2 h-6 w-6 p-0 ${isRecording ? 'text-red-500 animate-pulse' : ''
+                      }`}
                     onClick={toggleRecording}
                     title="Voice input"
                     aria-label="Toggle voice input"
@@ -507,7 +472,7 @@ export function ChatInput({
 
                 {isMobile && (
                   <div className="absolute right-2 bottom-2">
-                    <Badge 
+                    <Badge
                       variant={isNearLimit ? (isOverLimit ? "destructive" : "outline") : "secondary"}
                       className="text-xs"
                     >
@@ -520,11 +485,10 @@ export function ChatInput({
               <Button
                 onClick={handleSend}
                 disabled={!canSend}
-                className={`h-9 w-9 p-0 shrink-0 rounded-lg transition-all duration-200 ${
-                  canSend
-                    ? 'bg-primary hover:bg-primary/90 shadow-sm' 
+                className={`h-9 w-9 p-0 shrink-0 rounded-lg transition-all duration-200 ${canSend
+                    ? 'bg-primary hover:bg-primary/90 shadow-sm'
                     : 'bg-muted hover:bg-muted/80'
-                }`}
+                  }`}
                 aria-label="Send message"
               >
                 <Send className="h-4 w-4" />

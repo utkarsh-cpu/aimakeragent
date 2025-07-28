@@ -313,7 +313,7 @@ export class ConversationLazyLoader extends LazyLoader<Conversation> {
     }
   }
 
-  protected getCacheKey(offset: number, limit: number, filters?: any): string {
+  public getCacheKey(offset: number, limit: number, filters?: any): string {
     const filterStr = filters ? JSON.stringify(filters) : '';
     return `${offset}:${limit}:${filterStr}`;
   }
