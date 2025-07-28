@@ -529,6 +529,29 @@ export class ErrorHandler {
   }
 
   /**
+   * Sanitize error for logging (remove sensitive information)
+   */
+  static sanitizeError(error: ChatError): ChatError {
+    const sanitized = { ...error };
+    
+    if (sanitized.context) {
+      const sanitizedContext = { ...sanitized.context };
+      
+      // Redact sensitive fields
+      const sensitiveFields = ['apiKey', 'password', 'token', 'secret', 'key'];
+      for (const field of sensitiveFields) {
+        if (field in sanitizedContext) {
+          (sanitizedContext as any)[field] = '[REDACTED]';
+        }
+      }
+      
+      sanitized.context = sanitizedContext;
+    }
+    
+    return sanitized;
+  }
+
+  /**
    * Extract retry-after value from error message
    */
   private static extractRetryAfter(message: string): number | undefined {
@@ -621,7 +644,7 @@ export function createChatError(
   retryAfter?: number,
   context?: Partial<ChatError['context']>
 ): ChatError {
-  return {
+  const error = {
     type,
     message,
     details: originalError,
@@ -630,8 +653,11 @@ export function createChatError(
     retryAfter,
     severity: getErrorSeverity(type),
     context,
-    originalError
-  } as ChatError & { originalError?: Error };
+    originalError,
+    stack: new Error().stack
+  } as ChatError & { originalError?: Error; stack?: string };
+  
+  return error;
 }
 
 /**
@@ -758,7 +784,7 @@ export class ErrorReporter {
 
     // Log to console in development
     if (process.env.NODE_ENV === 'development') {
-      console.error('Error reported:', error);
+      console.error('ChatError:', error);
     }
 
     // In production, this would send to error tracking service
@@ -778,9 +804,48 @@ export class ErrorReporter {
   }
 
   /**
+   * Get error metrics
+   */
+  static getMetrics(): {
+    totalErrors: number;
+    errorsByType: Record<ErrorType, number>;
+    mostCommonError?: ErrorType;
+  } {
+    const errorsByType: Record<ErrorType, number> = Object.values(ErrorType).reduce((acc, type) => {
+      acc[type] = 0;
+      return acc;
+    }, {} as Record<ErrorType, number>);
+    let totalErrors = 0;
+    let mostCommonError: ErrorType | undefined;
+    let maxCount = 0;
+
+    for (const [type, count] of this.errorStats.entries()) {
+      errorsByType[type] = count;
+      totalErrors += count;
+      if (count > maxCount) {
+        maxCount = count;
+        mostCommonError = type;
+      }
+    }
+
+    return {
+      totalErrors,
+      errorsByType,
+      mostCommonError,
+    };
+  }
+
+  /**
    * Clear error statistics
    */
   static clearStats(): void {
+    this.errorStats.clear();
+  }
+
+  /**
+   * Clear error metrics
+   */
+  static clearMetrics(): void {
     this.errorStats.clear();
   }
 }

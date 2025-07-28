@@ -259,7 +259,11 @@ export class ConversationMemoryManager {
             messages: this.optimizeMessages(item.conversation.messages).slice(-maxMessagesForThis),
           };
 
-          reducedConv.metadata.messageCount = reducedConv.messages.length;
+          reducedConv.metadata = {
+            ...reducedConv.metadata,
+            messageCount: reducedConv.messages.length,
+            updatedAt: new Date(),
+          };
           result.push(reducedConv);
           totalMessages = totalMessages - item.conversation.messages.length + reducedConv.messages.length;
         }

@@ -134,7 +134,7 @@ export function useKeyboardNavigation(
     const isInInput = activeElement && (
       activeElement.tagName === 'INPUT' ||
       activeElement.tagName === 'TEXTAREA' ||
-      activeElement.contentEditable === 'true'
+      (activeElement as HTMLElement).contentEditable === 'true'
     );
 
     // Global shortcuts that work even in input fields

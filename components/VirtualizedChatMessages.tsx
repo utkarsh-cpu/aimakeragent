@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from './ui/context-menu';
-import { Copy, RotateCcw, ThumbsUp, ThumbsDown, User, Bot, Check, Quote, Trash2, Edit3, Share, Square, Loader2 } from 'lucide-react';
+import { Copy, RotateCcw, ThumbsUp, ThumbsDown, User, Bot, Check, Quote, Trash2, Edit3, Square, Loader2 } from 'lucide-react';
 import { cn } from './ui/utils';
 import { MessageEditor } from './MessageEditor';
 import { MessageSearch, SearchResult } from './MessageSearch';
@@ -26,6 +26,8 @@ interface VirtualizedChatMessagesProps {
   onToggleSearch?: () => void;
   enableVirtualScrolling?: boolean;
   virtualScrollThreshold?: number;
+  selectedMessageId?: string;
+  onMessageSelect?: (messageId: string | null) => void;
 }
 
 interface MessageItemProps {
@@ -579,12 +581,18 @@ export function VirtualizedChatMessages({
   onToggleSearch: _onToggleSearch,
   enableVirtualScrolling = true,
   virtualScrollThreshold = 50,
+  selectedMessageId: externalSelectedMessageId,
+  onMessageSelect,
 }: VirtualizedChatMessagesProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [ratings, setRatings] = useState<Record<string, 'up' | 'down'>>({});
   const [hoveredMessage, setHoveredMessage] = useState<string | null>(null);
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
-  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
+  const [internalSelectedMessageId, setInternalSelectedMessageId] = useState<string | null>(null);
+
+  // Use external selection if provided, otherwise use internal
+  const selectedMessageId = externalSelectedMessageId ?? internalSelectedMessageId;
+  const setSelectedMessageId = onMessageSelect ?? setInternalSelectedMessageId;
   const [_searchResults, _setSearchResults] = useState<SearchResult[]>([]);
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState<string>('');

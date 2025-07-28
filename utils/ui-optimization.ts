@@ -336,6 +336,101 @@ export function useRenderPerformance(componentName: string): void {
   });
 }
 
+// Debounced state hook for performance
+export function useDebouncedState<T>(
+  initialValue: T,
+  delay: number = 300
+): [T, T, (value: T) => void] {
+  const [value, setValue] = useState<T>(initialValue);
+  const [debouncedValue, setDebouncedValue] = useState<T>(initialValue);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    timeoutRef.current = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [value, delay]);
+
+  return [value, debouncedValue, setValue];
+}
+
+// Throttled callback hook
+export function useThrottledCallback<T extends (...args: any[]) => any>(
+  callback: T,
+  delay: number = 100
+): T {
+  const lastRun = useRef<number>(0);
+  const timeoutRef = useRef<NodeJS.Timeout>();
+
+  return useCallback(
+    ((...args: Parameters<T>) => {
+      const now = Date.now();
+      
+      if (now - lastRun.current >= delay) {
+        lastRun.current = now;
+        return callback(...args);
+      } else {
+        if (timeoutRef.current) {
+          clearTimeout(timeoutRef.current);
+        }
+        
+        timeoutRef.current = setTimeout(() => {
+          lastRun.current = Date.now();
+          callback(...args);
+        }, delay - (now - lastRun.current));
+      }
+    }) as T,
+    [callback, delay]
+  );
+}
+
+// Virtualization helper for large lists
+export function useVirtualization<T>(
+  items: T[],
+  itemHeight: number,
+  containerHeight: number,
+  overscan: number = 5
+) {
+  const [scrollTop, setScrollTop] = useState(0);
+
+  const startIndex = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
+  const endIndex = Math.min(
+    items.length - 1,
+    Math.ceil((scrollTop + containerHeight) / itemHeight) + overscan
+  );
+
+  const visibleItems = items.slice(startIndex, endIndex + 1);
+  const totalHeight = items.length * itemHeight;
+  const offsetY = startIndex * itemHeight;
+
+  return {
+    visibleItems,
+    totalHeight,
+    offsetY,
+    startIndex,
+    endIndex,
+    setScrollTop,
+  };
+}
+
+// Memory-efficient component wrapper
+export function withMemoryOptimization<P extends object>(
+  Component: React.ComponentType<P>,
+  shouldUpdate?: (prevProps: P, nextProps: P) => boolean
+) {
+  return React.memo(Component, shouldUpdate);
+}
+
 // Intersection Observer optimization
 export function useIntersectionObserver(
   elementRef: React.RefObject<Element>,
@@ -373,7 +468,7 @@ export function useIntersectionObserver(
 // Scroll optimization
 export function useOptimizedScroll(
   callback: (scrollY: number) => void,
-  throttleMs: number = 16
+  _throttleMs: number = 16 // Using requestAnimationFrame instead of throttleMs
 ): void {
   const callbackRef = useRef(callback);
   const throttleRef = useRef<number | null>(null);

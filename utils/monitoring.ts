@@ -250,27 +250,54 @@ class MonitoringService {
   }
 
   private getStorageMetrics(): SystemMetrics['storage'] {
-    if (typeof navigator !== 'undefined' && 'storage' in navigator && 'estimate' in navigator.storage) {
-      return navigator.storage.estimate().then(estimate => ({
-        used: estimate.usage || 0,
-        available: estimate.quota || 0,
-        percentage: estimate.usage && estimate.quota 
-          ? (estimate.usage / estimate.quota) * 100 
-          : 0
-      })).catch(() => ({
+    try {
+      if (typeof navigator !== 'undefined' && 'storage' in navigator && 'estimate' in navigator.storage) {
+        // Use the Storage API when available (async, but we'll handle it synchronously for now)
+        navigator.storage.estimate().then(estimate => {
+          const used = estimate.usage || 0;
+          const available = estimate.quota || 0;
+          const percentage = available > 0 ? (used / available) * 100 : 0;
+          
+          // Update metrics asynchronously
+          if (this.metrics) {
+            this.metrics.storage = { used, available, percentage };
+          }
+        }).catch(() => {
+          // Fallback handled below
+        });
+      }
+
+      // Synchronous fallback using localStorage estimation
+      let localStorageUsed = 0;
+      try {
+        for (const key in localStorage) {
+          if (localStorage.hasOwnProperty(key)) {
+            localStorageUsed += localStorage[key].length + key.length;
+          }
+        }
+      } catch (error) {
+        // localStorage might not be available
+      }
+
+      // Estimate based on localStorage (rough approximation)
+      const estimatedQuota = 10 * 1024 * 1024; // 10MB typical localStorage limit
+      const percentage = (localStorageUsed / estimatedQuota) * 100;
+
+      return {
+        used: localStorageUsed,
+        available: estimatedQuota - localStorageUsed,
+        percentage: Math.min(percentage, 100)
+      };
+    } catch (error) {
+      return {
         used: 0,
         available: 0,
         percentage: 0
-      }));
+      };
     }
-
-    // Fallback
-    return {
-      used: 0,
-      available: 0,
-      percentage: 0
-    };
   }
+
+
 
   private async runHealthChecks(): Promise<void> {
     // API Health Check

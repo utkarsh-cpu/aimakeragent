@@ -280,8 +280,7 @@ export function SettingsPanel({
         "Are you sure you want to reset all settings to defaults? This cannot be undone.",
       )
     ) {
-      const newSettings = resetSettings();
-      onSettingsChange(newSettings);
+      resetSettings();
     }
   };
 
