@@ -10,7 +10,7 @@ import { MessageEditor } from './MessageEditor';
 import { MessageSearch, SearchResult } from './MessageSearch';
 import { VirtualizedChatMessages } from './VirtualizedChatMessages';
 import { Message } from '../types/conversation';
-import { ChatAccessibility, ScreenReaderContent, AriaLiveRegionManager } from '../utils/accessibility';
+import { ChatAccessibility, AriaLiveRegionManager } from '../utils/accessibility';
 
 interface ChatMessagesProps {
   messages: Message[];

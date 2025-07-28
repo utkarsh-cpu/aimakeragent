@@ -44,7 +44,7 @@ export class ConfigManager {
     // Validate the new configuration
     const validation = ConfigValidator.validateOpenRouterConfig(newConfig);
     if (!validation.isValid) {
-      throw new Error(`Invalid configuration: ${validation.errors.join(', ')}`);
+      throw new Error(`Invalid configuration: ${validation.error || 'Unknown validation error'}`);
     }
 
     this.config = newConfig;
@@ -108,7 +108,7 @@ export class ConfigManager {
    */
   private loadConfig(): OpenRouterConfig {
     const storedApiKey = ApiKeyStorage.retrieve();
-    const storedConfig = SettingsStorage.retrieve<Partial<OpenRouterConfig>>({});
+    const storedConfig = SettingsStorage.retrieve() || {};
 
     return {
       ...DEFAULT_OPENROUTER_CONFIG,

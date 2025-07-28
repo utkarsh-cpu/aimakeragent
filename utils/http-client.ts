@@ -136,7 +136,7 @@ export class HttpClient {
     } catch (error) {
       clearTimeout(timeoutId);
 
-      if (error.name === 'AbortError') {
+      if ((error as Error).name === 'AbortError') {
         throw new Error('Request timeout');
       }
 

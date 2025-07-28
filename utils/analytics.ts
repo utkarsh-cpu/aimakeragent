@@ -58,14 +58,25 @@ class AnalyticsManager {
       try {
         const observer = new PerformanceObserver((list) => {
           for (const entry of list.getEntries()) {
+            let value = 0;
+            let unit: 'ms' | 'bytes' = 'ms';
+            
+            if (entry.duration) {
+              value = entry.duration;
+              unit = 'ms';
+            } else if (entry.entryType === 'resource' && 'transferSize' in entry) {
+              value = (entry as PerformanceResourceTiming).transferSize;
+              unit = 'bytes';
+            }
+            
             this.recordPerformanceMetric({
               name: entry.name,
-              value: entry.duration || entry.transferSize || 0,
-              unit: entry.duration ? 'ms' : 'bytes',
+              value,
+              unit,
               timestamp: new Date(entry.startTime),
               context: {
                 entryType: entry.entryType,
-                initiatorType: (entry as any).initiatorType
+                initiatorType: entry.entryType === 'resource' ? (entry as PerformanceResourceTiming).initiatorType : undefined
               }
             });
           }

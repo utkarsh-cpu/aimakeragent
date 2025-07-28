@@ -72,9 +72,9 @@ export class DataValidator {
         severity: 'error',
         fixable: true
       });
-      
+
       if (!fixedData) fixedData = { ...conversation };
-      fixedData.id = this.generateId();
+      fixedData!.id = this.generateId();
     }
 
     if (!conversation.title || typeof conversation.title !== 'string') {
@@ -84,9 +84,9 @@ export class DataValidator {
         severity: 'error',
         fixable: true
       });
-      
+
       if (!fixedData) fixedData = { ...conversation };
-      fixedData.title = 'Untitled Conversation';
+      fixedData!.title = 'Untitled Conversation';
     }
 
     // Validate messages array
@@ -97,22 +97,22 @@ export class DataValidator {
         severity: 'error',
         fixable: true
       });
-      
+
       if (!fixedData) fixedData = { ...conversation };
-      fixedData.messages = [];
+      fixedData!.messages = [];
     } else {
       // Validate individual messages
       const validMessages: Message[] = [];
-      
+
       for (let i = 0; i < conversation.messages.length; i++) {
         const messageResult = this.validateMessage(conversation.messages[i], i);
-        
+
         if (messageResult.isValid) {
           validMessages.push(messageResult.fixedData || conversation.messages[i]);
         } else {
           errors.push(...messageResult.errors);
           warnings.push(...messageResult.warnings);
-          
+
           if (messageResult.fixedData) {
             validMessages.push(messageResult.fixedData);
           }
@@ -121,7 +121,7 @@ export class DataValidator {
 
       if (validMessages.length !== conversation.messages.length) {
         if (!fixedData) fixedData = { ...conversation };
-        fixedData.messages = validMessages;
+        fixedData!.messages = validMessages;
       }
 
       // Check message count
@@ -134,29 +134,19 @@ export class DataValidator {
       }
     }
 
-    // Validate timestamps
-    if (!conversation.createdAt || !(conversation.createdAt instanceof Date)) {
-      errors.push({
-        field: 'createdAt',
-        message: 'Created date is missing or invalid',
-        severity: 'error',
-        fixable: true
-      });
-      
-      if (!fixedData) fixedData = { ...conversation };
-      fixedData.createdAt = new Date();
-    }
-
+    // Validate lastMessage timestamp
     if (!conversation.lastMessage || !(conversation.lastMessage instanceof Date)) {
       warnings.push({
         field: 'lastMessage',
         message: 'Last message date is missing or invalid',
-        suggestion: 'Will be set to creation date'
+        suggestion: 'Will be set to current date'
       });
-      
+
       if (!fixedData) fixedData = { ...conversation };
-      fixedData.lastMessage = fixedData.createdAt || new Date();
+      fixedData!.lastMessage = new Date();
     }
+
+
 
     // Validate metadata
     if (!conversation.metadata || typeof conversation.metadata !== 'object') {
@@ -165,16 +155,18 @@ export class DataValidator {
         message: 'Metadata is missing or invalid',
         suggestion: 'Default metadata will be applied'
       });
-      
+
       if (!fixedData) fixedData = { ...conversation };
-      fixedData.metadata = {
-        messageCount: fixedData.messages?.length || 0,
+      fixedData!.metadata = {
+        messageCount: fixedData!.messages?.length || 0,
+        tokenCount: 0,
         isFavorite: false,
         isArchived: false,
         tags: [],
         autoTitleGenerated: true,
-        createdAt: fixedData.createdAt || new Date(),
-        updatedAt: new Date()
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        lastActivity: new Date()
       };
     }
 
@@ -211,9 +203,9 @@ export class DataValidator {
         severity: 'error',
         fixable: true
       });
-      
+
       if (!fixedData) fixedData = { ...message };
-      fixedData.id = this.generateId();
+      fixedData!.id = this.generateId();
     }
 
     if (!message.content || typeof message.content !== 'string') {
@@ -223,18 +215,18 @@ export class DataValidator {
         severity: 'error',
         fixable: true
       });
-      
+
       if (!fixedData) fixedData = { ...message };
-      fixedData.content = '';
+      fixedData!.content = '';
     } else if (message.content.length > this.MAX_MESSAGE_LENGTH) {
       warnings.push({
         field: `${fieldPrefix}.content`,
         message: `Message content exceeds maximum length of ${this.MAX_MESSAGE_LENGTH} characters`,
         suggestion: 'Content will be truncated'
       });
-      
+
       if (!fixedData) fixedData = { ...message };
-      fixedData.content = message.content.substring(0, this.MAX_MESSAGE_LENGTH - 15) + '... [truncated]';
+      fixedData!.content = message.content.substring(0, this.MAX_MESSAGE_LENGTH - 15) + '... [truncated]';
     }
 
     // Validate role
@@ -246,9 +238,9 @@ export class DataValidator {
         severity: 'error',
         fixable: true
       });
-      
+
       if (!fixedData) fixedData = { ...message };
-      fixedData.role = 'user';
+      fixedData!.role = 'user';
     }
 
     // Validate timestamp
@@ -259,9 +251,9 @@ export class DataValidator {
         severity: 'error',
         fixable: true
       });
-      
+
       if (!fixedData) fixedData = { ...message };
-      fixedData.timestamp = new Date();
+      fixedData!.timestamp = new Date();
     }
 
     // Validate optional fields
@@ -271,9 +263,9 @@ export class DataValidator {
         message: 'Edit history must be an array',
         suggestion: 'Edit history will be reset'
       });
-      
+
       if (!fixedData) fixedData = { ...message };
-      fixedData.editHistory = [];
+      fixedData!.editHistory = [];
     }
 
     if (message.tokens && (typeof message.tokens !== 'number' || message.tokens < 0)) {
@@ -282,9 +274,9 @@ export class DataValidator {
         message: 'Token count must be a positive number',
         suggestion: 'Token count will be reset'
       });
-      
+
       if (!fixedData) fixedData = { ...message };
-      fixedData.tokens = undefined;
+      fixedData!.tokens = undefined;
     }
 
     return {
@@ -320,9 +312,9 @@ export class DataValidator {
         message: `Theme must be one of: ${validThemes.join(', ')}`,
         suggestion: 'Will default to system theme'
       });
-      
+
       if (!fixedData) fixedData = { ...settings };
-      fixedData.theme = 'system';
+      fixedData!.theme = 'system';
     }
 
     // Validate model
@@ -332,9 +324,9 @@ export class DataValidator {
         message: 'Model must be a valid string',
         suggestion: 'Will default to GPT-3.5 Turbo'
       });
-      
+
       if (!fixedData) fixedData = { ...settings };
-      fixedData.model = 'openai/gpt-3.5-turbo';
+      fixedData!.model = 'openai/gpt-3.5-turbo';
     }
 
     // Validate numeric settings
@@ -355,24 +347,34 @@ export class DataValidator {
           message: `${field} must be a number between ${min} and ${max}`,
           suggestion: `Will default to ${defaultValue}`
         });
-        
+
         if (!fixedData) fixedData = { ...settings };
         (fixedData as any)[field] = defaultValue;
       }
     }
 
     // Validate boolean settings
-    const booleanFields = ['streamingEnabled', 'autoSave', 'showTimestamps'];
+    const booleanFields = ['streamingEnabled', 'autoSave', 'soundEnabled', 'notificationsEnabled', 'autoTitle', 'debugMode', 'experimentalFeatures'];
     for (const field of booleanFields) {
       if (typeof settings[field] !== 'boolean') {
         warnings.push({
           field,
           message: `${field} must be a boolean`,
-          suggestion: 'Will default to true'
+          suggestion: 'Will default to appropriate value'
         });
-        
+
         if (!fixedData) fixedData = { ...settings };
-        (fixedData as any)[field] = true;
+        // Set appropriate defaults for each boolean field
+        const defaults: Record<string, boolean> = {
+          streamingEnabled: true,
+          autoSave: true,
+          soundEnabled: false,
+          notificationsEnabled: true,
+          autoTitle: true,
+          debugMode: false,
+          experimentalFeatures: false
+        };
+        (fixedData as any)[field] = defaults[field] ?? true;
       }
     }
 
@@ -407,12 +409,22 @@ export class DataValidator {
       streamingEnabled: true,
       autoSave: true,
       fontSize: 14,
-      showTimestamps: true,
+      language: 'en',
+      sidebarWidth: 300,
+      messageSpacing: 16,
+      soundEnabled: false,
+      notificationsEnabled: true,
+      conversationHistory: 50,
+      autoTitle: true,
+      debugMode: false,
+      experimentalFeatures: false,
       openRouter: {
         apiKey: '',
         baseUrl: 'https://openrouter.ai/api/v1',
+        defaultModel: 'openai/gpt-3.5-turbo',
         timeout: 30000,
-        retryAttempts: 3
+        retryAttempts: 3,
+        streamingEnabled: true
       }
     };
   }
@@ -438,14 +450,14 @@ export class DataRecovery {
 
       const backupId = `backup_${Date.now()}`;
       const existingBackups = this.getBackupList();
-      
+
       // Store the new backup
       localStorage.setItem(`${this.BACKUP_KEY}_${backupId}`, JSON.stringify(backupData));
-      
+
       // Update backup list
       const updatedBackups = [backupId, ...existingBackups].slice(0, this.MAX_BACKUPS);
       localStorage.setItem(`${this.BACKUP_KEY}_list`, JSON.stringify(updatedBackups));
-      
+
       // Clean up old backups
       for (const oldBackupId of existingBackups.slice(this.MAX_BACKUPS - 1)) {
         localStorage.removeItem(`${this.BACKUP_KEY}_${oldBackupId}`);
@@ -474,13 +486,13 @@ export class DataRecovery {
       }
 
       const backup: BackupData = JSON.parse(backupData);
-      
+
       // Verify checksum
       const expectedChecksum = this.calculateChecksum({
         conversations: backup.conversations,
         settings: backup.settings
       });
-      
+
       if (backup.checksum !== expectedChecksum) {
         throw new Error('Backup data is corrupted (checksum mismatch)');
       }
@@ -517,8 +529,8 @@ export class DataRecovery {
    * Validate and fix data corruption
    */
   static validateAndFixData(
-    conversations: Conversation[], 
-    settings: ChatSettings, 
+    conversations: Conversation[],
+    settings: ChatSettings,
     autoFix: boolean = true
   ): { conversations: Conversation[], settings: ChatSettings, errors: ValidationError[], warnings: ValidationWarning[] } {
     const allErrors: ValidationError[] = [];
@@ -558,7 +570,7 @@ export class DataRecovery {
     try {
       // Try to load from most recent backup
       const backups = this.getBackupList();
-      
+
       for (const backupId of backups) {
         try {
           const recovered = await this.restoreFromBackup(backupId, {
@@ -567,7 +579,7 @@ export class DataRecovery {
             createBackup: false,
             mergeStrategy: 'replace'
           });
-          
+
           console.log(`Successfully recovered from backup: ${backupId}`);
           return recovered;
         } catch (error) {
@@ -580,8 +592,8 @@ export class DataRecovery {
       try {
         const currentData = this.loadCurrentData();
         const validationResult = this.validateAndFixData(
-          currentData.conversations, 
-          currentData.settings, 
+          currentData.conversations,
+          currentData.settings,
           true
         );
 
@@ -622,13 +634,13 @@ export class DataRecovery {
     try {
       const backupData = localStorage.getItem(`${this.BACKUP_KEY}_${backupId}`);
       if (!backupData) return null;
-      
+
       const parsed = JSON.parse(backupData);
       // Convert timestamp back to Date object
       if (parsed.timestamp) {
         parsed.timestamp = new Date(parsed.timestamp);
       }
-      
+
       return parsed;
     } catch {
       return null;
@@ -641,11 +653,11 @@ export class DataRecovery {
   static deleteBackup(backupId: string): boolean {
     try {
       localStorage.removeItem(`${this.BACKUP_KEY}_${backupId}`);
-      
+
       // Update backup list
       const backups = this.getBackupList().filter(id => id !== backupId);
       localStorage.setItem(`${this.BACKUP_KEY}_list`, JSON.stringify(backups));
-      
+
       return true;
     } catch {
       return false;
@@ -694,13 +706,13 @@ export class DataRecovery {
   private static calculateChecksum(data: any): string {
     const str = JSON.stringify(data);
     let hash = 0;
-    
+
     for (let i = 0; i < str.length; i++) {
       const char = str.charCodeAt(i);
       hash = ((hash << 5) - hash) + char;
       hash = hash & hash; // Convert to 32-bit integer
     }
-    
+
     return hash.toString(36);
   }
 
@@ -722,16 +734,16 @@ export class DataRecovery {
       try {
         const currentData = this.loadCurrentData();
         const validationResult = this.validateAndFixData(currentData.conversations, currentData.settings, false);
-        
+
         if (validationResult.errors.length > 0) {
           errors.push(`Found ${validationResult.errors.length} data validation errors`);
         }
-        
+
         if (validationResult.warnings.length > 0) {
           errors.push(`Found ${validationResult.warnings.length} data validation warnings`);
         }
       } catch (error) {
-        errors.push(`Failed to load current data: ${error.message}`);
+        errors.push(`Failed to load current data: ${(error as Error).message}`);
       }
 
       // Check if backups are available
@@ -746,7 +758,7 @@ export class DataRecovery {
         canRecover
       };
     } catch (error) {
-      errors.push(`Integrity check failed: ${error.message}`);
+      errors.push(`Integrity check failed: ${(error as Error).message}`);
       return { isValid: false, errors, canRecover };
     }
   }

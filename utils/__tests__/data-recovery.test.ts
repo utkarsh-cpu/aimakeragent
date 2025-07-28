@@ -2,7 +2,7 @@
  * Tests for the DataValidator and DataRecovery classes
  */
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { DataValidator, DataRecovery } from '../data-recovery';
 import { Conversation, Message } from '../../types/conversation';
 import { ChatSettings } from '../../types/settings';
@@ -45,16 +45,17 @@ describe('DataValidator', () => {
             timestamp: new Date()
           }
         ],
-        createdAt: new Date(),
         lastMessage: new Date(),
         metadata: {
           messageCount: 1,
+          tokenCount: 0,
           isFavorite: false,
           isArchived: false,
           tags: [],
           autoTitleGenerated: true,
           createdAt: new Date(),
-          updatedAt: new Date()
+          updatedAt: new Date(),
+          lastActivity: new Date()
         }
       };
 
@@ -190,12 +191,22 @@ describe('DataValidator', () => {
         streamingEnabled: true,
         autoSave: true,
         fontSize: 14,
-        showTimestamps: true,
+        soundEnabled: false,
+        notificationsEnabled: true,
+        language: 'en',
+        sidebarWidth: 300,
+        messageSpacing: 16,
+        conversationHistory: 50,
+        autoTitle: true,
+        debugMode: false,
+        experimentalFeatures: false,
         openRouter: {
           apiKey: 'test-key',
           baseUrl: 'https://openrouter.ai/api/v1',
+          defaultModel: 'openai/gpt-3.5-turbo',
           timeout: 30000,
-          retryAttempts: 3
+          retryAttempts: 3,
+          streamingEnabled: true
         }
       };
 
@@ -226,7 +237,7 @@ describe('DataValidator', () => {
       expect(result.warnings.some(w => w.field === 'temperature')).toBe(true);
       expect(result.warnings.some(w => w.field === 'maxTokens')).toBe(true);
       expect(result.warnings.some(w => w.field === 'topP')).toBe(true);
-      
+
       expect(result.fixedData?.temperature).toBe(0.7);
       expect(result.fixedData?.maxTokens).toBe(1000);
       expect(result.fixedData?.topP).toBe(1);
@@ -254,16 +265,17 @@ describe('DataRecovery', () => {
           timestamp: new Date()
         }
       ],
-      createdAt: new Date(),
       lastMessage: new Date(),
       metadata: {
         messageCount: 1,
+        tokenCount: 0,
         isFavorite: false,
         isArchived: false,
         tags: [],
         autoTitleGenerated: true,
         createdAt: new Date(),
-        updatedAt: new Date()
+        updatedAt: new Date(),
+        lastActivity: new Date()
       }
     }
   ];
@@ -280,12 +292,22 @@ describe('DataRecovery', () => {
     streamingEnabled: true,
     autoSave: true,
     fontSize: 14,
-    showTimestamps: true,
+    soundEnabled: false,
+    notificationsEnabled: true,
+    language: 'en',
+    sidebarWidth: 300,
+    messageSpacing: 16,
+    conversationHistory: 50,
+    autoTitle: true,
+    debugMode: false,
+    experimentalFeatures: false,
     openRouter: {
       apiKey: 'test-key',
       baseUrl: 'https://openrouter.ai/api/v1',
+      defaultModel: 'openai/gpt-3.5-turbo',
       timeout: 30000,
-      retryAttempts: 3
+      retryAttempts: 3,
+      streamingEnabled: true
     }
   };
 
@@ -297,7 +319,7 @@ describe('DataRecovery', () => {
   describe('createBackup', () => {
     it('should create a backup successfully', async () => {
       const backupId = await DataRecovery.createBackup(mockConversations, mockSettings);
-      
+
       expect(backupId).toBeTruthy();
       expect(backupId.startsWith('backup_')).toBe(true);
       expect(localStorageMock.setItem).toHaveBeenCalled();
@@ -306,7 +328,7 @@ describe('DataRecovery', () => {
     it('should maintain backup list', async () => {
       const backupId1 = await DataRecovery.createBackup(mockConversations, mockSettings);
       const backupId2 = await DataRecovery.createBackup(mockConversations, mockSettings);
-      
+
       const backupList = DataRecovery.getBackupList();
       expect(backupList).toContain(backupId1);
       expect(backupList).toContain(backupId2);
@@ -318,7 +340,7 @@ describe('DataRecovery', () => {
       for (let i = 0; i < 7; i++) {
         await DataRecovery.createBackup(mockConversations, mockSettings);
       }
-      
+
       const backupList = DataRecovery.getBackupList();
       expect(backupList.length).toBe(5);
     });
@@ -327,14 +349,14 @@ describe('DataRecovery', () => {
   describe('restoreFromBackup', () => {
     it('should restore from backup successfully', async () => {
       const backupId = await DataRecovery.createBackup(mockConversations, mockSettings);
-      
+
       const restored = await DataRecovery.restoreFromBackup(backupId, {
         validateData: false,
         fixCorruption: false,
         createBackup: false,
         mergeStrategy: 'replace'
       });
-      
+
       expect(restored.conversations).toHaveLength(1);
       expect(restored.conversations[0].title).toBe('Test Conversation');
       expect(restored.settings.theme).toBe('dark');
@@ -353,16 +375,16 @@ describe('DataRecovery', () => {
           messages: 'not an array'
         }
       ];
-      
+
       const backupId = await DataRecovery.createBackup(invalidConversations as any, mockSettings);
-      
+
       const restored = await DataRecovery.restoreFromBackup(backupId, {
         validateData: true,
         fixCorruption: true,
         createBackup: false,
         mergeStrategy: 'replace'
       });
-      
+
       // Should have fixed the invalid data
       expect(restored.conversations).toHaveLength(1);
       expect(restored.conversations[0].id).toBeTruthy();
@@ -380,13 +402,13 @@ describe('DataRecovery', () => {
           createdAt: new Date()
         }
       ];
-      
+
       const result = DataRecovery.validateAndFixData(
         corruptedConversations as any,
         mockSettings,
         true
       );
-      
+
       expect(result.errors.length).toBeGreaterThan(0);
       expect(result.conversations).toHaveLength(1);
       expect(result.conversations[0].id).toBeTruthy();
@@ -404,13 +426,13 @@ describe('DataRecovery', () => {
           lastMessage: new Date()
         }
       ];
-      
+
       const result = DataRecovery.validateAndFixData(
         corruptedConversations as any,
         mockSettings,
         true
       );
-      
+
       expect(result.conversations).toHaveLength(1);
       expect(result.conversations[0].title).toBe('Valid');
     });
@@ -425,7 +447,7 @@ describe('DataRecovery', () => {
     it('should return backup list', async () => {
       const backupId = await DataRecovery.createBackup(mockConversations, mockSettings);
       const backups = DataRecovery.getBackupList();
-      
+
       expect(backups).toContain(backupId);
     });
   });
@@ -434,7 +456,7 @@ describe('DataRecovery', () => {
     it('should return backup info', async () => {
       const backupId = await DataRecovery.createBackup(mockConversations, mockSettings);
       const info = DataRecovery.getBackupInfo(backupId);
-      
+
       expect(info).toBeTruthy();
       expect(info?.conversations).toHaveLength(1);
       expect(info?.timestamp).toBeInstanceOf(Date);
@@ -450,13 +472,13 @@ describe('DataRecovery', () => {
   describe('deleteBackup', () => {
     it('should delete backup successfully', async () => {
       const backupId = await DataRecovery.createBackup(mockConversations, mockSettings);
-      
+
       const deleted = DataRecovery.deleteBackup(backupId);
       expect(deleted).toBe(true);
-      
+
       const info = DataRecovery.getBackupInfo(backupId);
       expect(info).toBeNull();
-      
+
       const backups = DataRecovery.getBackupList();
       expect(backups).not.toContain(backupId);
     });
@@ -472,7 +494,7 @@ describe('DataRecovery', () => {
       // Set up valid data in localStorage
       localStorageMock.setItem('conversations', JSON.stringify(mockConversations));
       localStorageMock.setItem('settings', JSON.stringify(mockSettings));
-      
+
       const integrity = DataRecovery.checkDataIntegrity();
       expect(integrity.isValid).toBe(true);
       expect(integrity.errors).toHaveLength(0);
@@ -482,7 +504,7 @@ describe('DataRecovery', () => {
       // Set up invalid data
       localStorageMock.setItem('conversations', JSON.stringify([{ invalid: 'data' }]));
       localStorageMock.setItem('settings', JSON.stringify({ invalid: 'settings' }));
-      
+
       const integrity = DataRecovery.checkDataIntegrity();
       expect(integrity.isValid).toBe(false);
       expect(integrity.errors.length).toBeGreaterThan(0);
@@ -491,10 +513,10 @@ describe('DataRecovery', () => {
     it('should indicate recovery possibility when backups exist', async () => {
       // Create a backup first
       await DataRecovery.createBackup(mockConversations, mockSettings);
-      
+
       // Set up corrupted data
       localStorageMock.setItem('conversations', 'invalid json');
-      
+
       const integrity = DataRecovery.checkDataIntegrity();
       expect(integrity.canRecover).toBe(true);
     });

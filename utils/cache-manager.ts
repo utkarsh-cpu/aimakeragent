@@ -38,8 +38,8 @@ interface CacheStats {
 // Strategy pattern for eviction policies
 interface EvictionStrategy<T> {
   selectItemsToEvict(
-    cache: Map<string, CacheEntry<T>>, 
-    requiredSpace: number, 
+    cache: Map<string, CacheEntry<T>>,
+    requiredSpace: number,
     maxSize: number
   ): string[];
   getName(): string;
@@ -56,8 +56,8 @@ class LRUEvictionStrategy<T> implements EvictionStrategy<T> {
   }
 
   selectItemsToEvict(
-    cache: Map<string, CacheEntry<T>>, 
-    requiredSpace: number, 
+    cache: Map<string, CacheEntry<T>>,
+    requiredSpace: number,
     maxSize: number
   ): string[] {
     const entries = Array.from(cache.entries()).sort(([, a], [, b]) => {
@@ -151,7 +151,7 @@ class CacheStatistics {
 
   getStats(totalItems: number, totalSize: number): CacheStats {
     const totalRequests = this.stats.hits + this.stats.misses;
-    
+
     return {
       totalItems,
       totalSize,
@@ -168,7 +168,7 @@ class CacheStatistics {
 
 // Separate class for storage persistence
 class CacheStorage<T> {
-  constructor(private config: CacheConfig) {}
+  constructor(private config: CacheConfig) { }
 
   persist(cache: Map<string, CacheEntry<T>>): void {
     if (!this.config.persistToStorage || typeof localStorage === 'undefined') {
@@ -180,7 +180,7 @@ class CacheStorage<T> {
         entries: Array.from(cache.entries()),
         timestamp: Date.now(),
       };
-      
+
       localStorage.setItem(this.config.storageKey, JSON.stringify(cacheData));
     } catch (error) {
       console.warn('Failed to persist cache to storage:', error);
@@ -189,7 +189,7 @@ class CacheStorage<T> {
 
   load(): Map<string, CacheEntry<T>> {
     const cache = new Map<string, CacheEntry<T>>();
-    
+
     if (!this.config.persistToStorage || typeof localStorage === 'undefined') {
       return cache;
     }
@@ -239,9 +239,9 @@ export class CacheManager<T = any> {
     this.storage = new CacheStorage(this.config);
     this.evictionStrategy = evictionStrategy || new LRUEvictionStrategy<T>();
     this.compressionStrategy = compressionStrategy || new NoCompressionStrategy<T>();
-    
+
     this.cache = this.storage.load();
-    
+
     // Periodic cleanup with proper cleanup on destruction
     this.cleanupInterval = setInterval(() => this.cleanup(), 5 * 60 * 1000);
   }
@@ -265,10 +265,10 @@ export class CacheManager<T = any> {
     const stats = this.getStats();
     const memoryUsageMB = stats.totalSize / (1024 * 1024);
     const maxMemoryMB = this.config.maxMemoryUsage;
-    
+
     let memoryPressure: 'low' | 'medium' | 'high' = 'low';
     let recommendedAction = 'No action needed';
-    
+
     if (memoryUsageMB > maxMemoryMB * 0.8) {
       memoryPressure = 'high';
       recommendedAction = 'Consider clearing cache or reducing cache size';
@@ -276,9 +276,9 @@ export class CacheManager<T = any> {
       memoryPressure = 'medium';
       recommendedAction = 'Monitor cache usage';
     }
-    
+
     const cacheEfficiency = stats.hitRate;
-    
+
     return {
       memoryPressure,
       recommendedAction,
@@ -292,7 +292,7 @@ export class CacheManager<T = any> {
   get(key: string): T | null {
     try {
       const entry = this.cache.get(key);
-      
+
       if (!entry) {
         this.statistics.recordMiss();
         return null;
@@ -324,7 +324,7 @@ export class CacheManager<T = any> {
   set(key: string, data: T): void {
     const { data: compressedData, compressed } = this.compressionStrategy.compress(data);
     const size = this.estimateSize(compressedData);
-    
+
     const entry: CacheEntry<T> = {
       data: compressedData,
       timestamp: Date.now(),
@@ -370,7 +370,7 @@ export class CacheManager<T = any> {
   getStats(): CacheStats {
     const totalItems = this.cache.size;
     const totalSize = Array.from(this.cache.values()).reduce((sum, entry) => sum + entry.size, 0);
-    
+
     return this.statistics.getStats(totalItems, totalSize);
   }
 
@@ -379,14 +379,14 @@ export class CacheManager<T = any> {
    */
   getMultiple(keys: string[]): Map<string, T> {
     const result = new Map<string, T>();
-    
+
     for (const key of keys) {
       const value = this.get(key);
       if (value !== null) {
         result.set(key, value);
       }
     }
-    
+
     return result;
   }
 
@@ -444,7 +444,7 @@ export class CacheManager<T = any> {
     const maxSizeBytes = this.config.maxMemoryUsage * 1024 * 1024;
 
     // Check if we need to evict based on size or count
-    const needsEviction = 
+    const needsEviction =
       this.cache.size >= this.config.maxCacheSize ||
       currentSize + newItemSize > maxSizeBytes;
 
@@ -469,11 +469,11 @@ export class CacheManager<T = any> {
     if (typeof data === 'string') {
       return data.length * 2; // UTF-16 encoding
     }
-    
+
     if (typeof data === 'object' && data !== null) {
       return JSON.stringify(data).length * 2;
     }
-    
+
     return 8; // Default size for primitives
   }
 
@@ -524,14 +524,14 @@ export class ConversationCache extends CacheManager<Conversation> {
   getConversations(ids: string[]): Map<string, Conversation> {
     const keys = ids.map(id => `conv:${id}`);
     const cached = this.getMultiple(keys);
-    
+
     // Convert back to original IDs
     const result = new Map<string, Conversation>();
     for (const [key, conversation] of cached) {
       const id = key.replace('conv:', '');
       result.set(id, conversation);
     }
-    
+
     return result;
   }
 

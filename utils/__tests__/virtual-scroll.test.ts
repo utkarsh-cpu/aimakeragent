@@ -133,8 +133,8 @@ describe("VirtualScrollManager", () => {
     });
 
     it("should return true for first update", () => {
-      // First update with scroll position > threshold (50)
-      expect(manager.shouldUpdate(100)).toBe(true);
+      // First update with scroll position > threshold (1000)
+      expect(manager.shouldUpdate(1100)).toBe(true);
     });
 
     it("should update lastScrollTop when returning true", () => {

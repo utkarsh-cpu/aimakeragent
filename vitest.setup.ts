@@ -61,7 +61,7 @@ Object.defineProperty(navigator, 'onLine', {
 });
 
 // Mock SpeechRecognition
-global.SpeechRecognition = vi.fn().mockImplementation(() => ({
+(global as any).SpeechRecognition = vi.fn().mockImplementation(() => ({
   start: vi.fn(),
   stop: vi.fn(),
   abort: vi.fn(),
@@ -86,7 +86,7 @@ global.SpeechRecognition = vi.fn().mockImplementation(() => ({
   onstart: null,
 }));
 
-global.webkitSpeechRecognition = global.SpeechRecognition;
+(global as any).webkitSpeechRecognition = (global as any).SpeechRecognition;
 
 // Mock scrollIntoView
 Element.prototype.scrollIntoView = vi.fn();

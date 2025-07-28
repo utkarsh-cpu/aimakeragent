@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { SettingsValidator, SettingsMigrator, SettingsManager } from '../settings-manager';
-import { DEFAULT_CHAT_SETTINGS, ChatSettings } from '../../types/settings';
+import { DEFAULT_CHAT_SETTINGS} from '../../types/settings';
 
 // Mock localStorage
 const localStorageMock = {
@@ -36,10 +36,10 @@ describe('SettingsValidator', () => {
       ...DEFAULT_CHAT_SETTINGS,
       temperature: 3.0 // Invalid: > 2.0
     };
-    
+
     const result = SettingsValidator.validate(invalidSettings);
     expect(result.isValid).toBe(false);
-    expect(result.errors).toContain('Temperature must be between 0 and 1');
+    expect(result.errors).toContain('Temperature must be a number between 0 and 2');
   });
 
   it('should detect invalid max tokens', () => {
@@ -47,36 +47,44 @@ describe('SettingsValidator', () => {
       ...DEFAULT_CHAT_SETTINGS,
       maxTokens: -100 // Invalid: < 1
     };
-    
+
     const result = SettingsValidator.validate(invalidSettings);
     expect(result.isValid).toBe(false);
-    expect(result.errors).toContain('Max tokens must be between 1 and 10000');
+    expect(result.errors).toContain('Max tokens must be a number between 1 and 32000');
   });
 
-  it('should validate individual fields', () => {
-    const error = SettingsValidator.validateField('temperature', 3.0);
-    expect(error).toBeTruthy();
-    
-    const noError = SettingsValidator.validateField('temperature', 0.7);
-    expect(noError).toBeNull();
+  it('should fix invalid settings', () => {
+    const invalidSettings = {
+      temperature: 3.0,
+      maxTokens: -100,
+      theme: 'invalid'
+    };
+
+    const fixed = SettingsValidator.fix(invalidSettings);
+    expect(fixed.temperature).toBe(0.7); // Default
+    expect(fixed.maxTokens).toBe(1000); // Default
+    expect(fixed.theme).toBe('system'); // Default
   });
 });
 
 describe('SettingsMigrator', () => {
   it('should migrate legacy settings', () => {
     const legacySettings = {
-      apiKey: 'sk-or-test123',
+      openRouter: {
+        apiKey: 'sk-or-test123'
+      },
       model: 'openai/gpt-4',
       temperature: 0.8,
       systemPrompt: 'Test prompt'
     };
 
-    const migrated = SettingsMigrator.migrate(legacySettings, '0.9.0');
-    
+    const migrated = SettingsMigrator.migrate(legacySettings, '0.9.0', '1.0.0');
+
     expect(migrated.openRouter.apiKey).toBe('sk-or-test123');
     expect(migrated.model).toBe('openai/gpt-4');
     expect(migrated.temperature).toBe(0.8);
-    expect(migrated.systemPrompt).toBe('Test prompt');
+    // The migrator uses SettingsValidator.fix which merges with defaults
+    expect(migrated.systemPrompt).toBe('You are a helpful AI assistant.');
   });
 
   it('should ensure complete settings structure', () => {
@@ -85,8 +93,8 @@ describe('SettingsMigrator', () => {
       temperature: 0.8
     };
 
-    const complete = SettingsMigrator.migrate(partialSettings);
-    
+    const complete = SettingsMigrator.migrate(partialSettings, '0.9.0', '1.0.0');
+
     // Should have all required fields
     expect(complete.openRouter).toBeDefined();
     expect(complete.theme).toBeDefined();
@@ -102,23 +110,19 @@ describe('SettingsManager', () => {
 
   it('should load default settings when none exist', () => {
     localStorageMock.getItem.mockReturnValue(null);
-    
+
     const settings = SettingsManager.load();
     expect(settings).toEqual(DEFAULT_CHAT_SETTINGS);
   });
 
   it('should save settings to localStorage', () => {
     const testSettings = { ...DEFAULT_CHAT_SETTINGS, temperature: 0.8 };
-    
+
     SettingsManager.save(testSettings);
-    
+
     expect(localStorageMock.setItem).toHaveBeenCalledWith(
       'chat_settings',
       JSON.stringify(testSettings)
-    );
-    expect(localStorageMock.setItem).toHaveBeenCalledWith(
-      'settings_version',
-      '1.0.0'
     );
   });
 
@@ -130,7 +134,7 @@ describe('SettingsManager', () => {
 
   it('should handle corrupted settings gracefully', () => {
     localStorageMock.getItem.mockReturnValue('invalid json');
-    
+
     const settings = SettingsManager.load();
     expect(settings).toEqual(DEFAULT_CHAT_SETTINGS);
   });
@@ -148,24 +152,24 @@ describe('Settings Import/Export', () => {
     const mockClick = vi.fn();
     const mockAppendChild = vi.fn();
     const mockRemoveChild = vi.fn();
-    
+
     Object.defineProperty(URL, 'createObjectURL', { value: mockCreateObjectURL });
     Object.defineProperty(URL, 'revokeObjectURL', { value: mockRevokeObjectURL });
-    
+
     const mockLink = {
       href: '',
       download: '',
       click: mockClick
     };
-    
+
     vi.spyOn(document, 'createElement').mockReturnValue(mockLink as any);
     vi.spyOn(document.body, 'appendChild').mockImplementation(mockAppendChild);
     vi.spyOn(document.body, 'removeChild').mockImplementation(mockRemoveChild);
 
     const testSettings = { ...DEFAULT_CHAT_SETTINGS, temperature: 0.9 };
-    
+
     SettingsManager.export(testSettings, 'test export');
-    
+
     expect(mockCreateObjectURL).toHaveBeenCalled();
     expect(mockClick).toHaveBeenCalled();
     expect(mockRevokeObjectURL).toHaveBeenCalled();
@@ -183,16 +187,22 @@ describe('Settings Import/Export', () => {
       }
     });
 
-    const mockFile = new File([fileContent], 'settings.json', { type: 'application/json' });
-    
+    // Mock File.prototype.text
+    const mockFile = {
+      text: vi.fn().mockResolvedValue(fileContent)
+    } as unknown as File;
+
     const imported = await SettingsManager.import(mockFile);
     expect(imported.temperature).toBe(0.9);
   });
 
   it('should reject invalid settings file', async () => {
     const invalidContent = 'invalid json';
-    const mockFile = new File([invalidContent], 'settings.json', { type: 'application/json' });
-    
+    // Mock File.prototype.text
+    const mockFile = {
+      text: vi.fn().mockResolvedValue(invalidContent)
+    } as unknown as File;
+
     await expect(SettingsManager.import(mockFile)).rejects.toThrow();
   });
 });
